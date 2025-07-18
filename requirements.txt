@@ -3,4 +3,7 @@ Flask
 python-telegram-bot
 requests
 SQLAlchemy
+python-dotenv
+PyMySQL
+python-wordpress-xmlrpc
 # Add other libraries as needed

@@ -1,6 +1,7 @@
 import requests
 import json
 import uuid
+import base64
 from app.database import SessionLocal
 from app.models import Conversation
 
@@ -8,12 +9,18 @@ class LearningAgent:
     def __init__(self, ollama_base_url="http://localhost:11434"):
         self.ollama_base_url = ollama_base_url
         self.db = SessionLocal()
-        self.session_id = str(uuid.uuid4()) # Create a unique ID for this conversation session
+        self.session_id = str(uuid.uuid4())
+        self.system_prompt = {
+            "role": "system",
+            "content": "شما یک دستیار هوش مصنوعی برای یک کسب و کار فروش لوازم تحریر لوکس هستید. نام شما 'چی‌چی' است. شما باید همیشه به زبان فارسی و با لحنی بسیار دوستانه، خودمانی و محاوره‌ای پاسخ دهید. از کلمات انگلیسی یا فینگلیش استفاده نکنید. هدف شما کمک به صاحب کسب و کار برای افزایش فروش و بهبود عملکرد است."
+        }
 
     def _load_history(self):
         """Loads conversation history for the current session from the DB."""
         history = self.db.query(Conversation).filter(Conversation.session_id == self.session_id).order_by(Conversation.timestamp).all()
-        return [{"role": h.role, "content": h.content} for h in history]
+        messages = [self.system_prompt]
+        messages.extend([{"role": h.role, "content": h.content} for h in history])
+        return messages
 
     def _save_message(self, role, content):
         """Saves a message to the conversation history in the DB."""
@@ -25,13 +32,22 @@ class LearningAgent:
         self.db.add(message)
         self.db.commit()
 
-    def chat(self, user_input, model="llama3"):
+    def chat(self, user_input, model="llama3", image_data=None):
         """
-        Sends a message to the Llama3 model and gets a response,
-        while maintaining history in the database.
+        Sends a message (and optionally an image) to the Llama3 model and gets a response.
         """
+        # Prepare the user message
+        user_message = {"role": "user", "content": user_input}
+        if image_data:
+            # Add image to the message if present (for multimodal models)
+            user_message["images"] = [image_data]
+
+        # Save only the text part to DB to avoid storing large image data
         self._save_message("user", user_input)
+
+        # Load full history including the new message
         conversation_history = self._load_history()
+        conversation_history.append(user_message)
 
         api_url = f"{self.ollama_base_url}/api/chat"
         payload = {
@@ -59,25 +75,38 @@ class LearningAgent:
 
         except requests.exceptions.RequestException as e:
             print(f"Error communicating with Ollama: {e}")
-            return "Sorry, I'm having trouble connecting to my brain."
+            return "ای وای! انگار یه مشکلی پیش اومده و نمی‌تونم به مغزم وصل بشم. یه چند لحظه دیگه دوباره امتحان کن."
 
-    def get_advice(self, competitor_analysis_results):
+    def analyze_image(self, user_prompt, image_path, model="llava"):
         """
-        Generates business advice based on competitor analysis.
+        Analyzes an image using a multimodal model like Llava.
+        The image_path is the path to the image file.
         """
-        prompt = "Based on the following analysis of my competitors, please provide some actionable advice for my luxury stationery business:\n\n"
-        for result in competitor_analysis_results:
-            prompt += f"- {result.competitor.url}: {result.description}\n"
+        try:
+            with open(image_path, "rb") as image_file:
+                encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
 
-        prompt += "\nWhat are some creative marketing ideas or product improvements I could make?"
+            # Use the chat method to send the image and prompt
+            # Make sure the 'model' parameter is a multimodal model you have, like 'llava'
+            return self.chat(user_prompt, model=model, image_data=encoded_string)
 
-        return self.chat(prompt)
+        except Exception as e:
+            print(f"Error analyzing image: {e}")
+            return "شرمنده، نتونستم عکس رو تحلیل کنم. فایلش مشکلی نداشت؟"
+
 
 if __name__ == '__main__':
     agent = LearningAgent()
     print(f"Starting new chat session: {agent.session_id}")
 
-    print("AI Assistant: Hello! How can I help you today?")
+    # Example image analysis:
+    # Make sure you have a model like 'llava' by running 'ollama pull llava'
+    # And have an image file named 'test_image.jpg'
+    # with open("test_image.jpg", "w") as f: f.write("dummy") # Create a dummy file for testing
+    # advice = agent.analyze_image("این پست اینستاگرام رو تحلیل کن و بگو چطور می‌تونم بهترش کنم.", "test_image.jpg")
+    # print(f"\n--- Image Analysis Advice ---\n{advice}")
+
+    print("AI Assistant: سلام! من چی‌چی هستم. چه کمکی از دستم برمیاد؟")
     while True:
         user_message = input("You: ")
         if user_message.lower() in ["exit", "quit"]:

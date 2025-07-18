@@ -1,7 +1,10 @@
 from flask import Flask, render_template, request, jsonify
+from dotenv import load_dotenv
 from app.database import SessionLocal
 from app.models import Competitor, AnalysisResult, Conversation
 from app.learning_agent import LearningAgent
+
+load_dotenv()
 
 app = Flask(__name__)
 db = SessionLocal()
@@ -16,13 +19,15 @@ def dashboard():
     latest_analyses = db.query(AnalysisResult).order_by(AnalysisResult.analysis_date.desc()).limit(5).all()
     return render_template("dashboard.html", competitors=competitors, analyses=latest_analyses)
 
+from sqlalchemy.orm import joinedload
+
 @app.route("/competitors")
 def competitors_page():
     """
     Renders the page showing all competitors and their analyses.
     """
     all_competitors = db.query(Competitor).options(
-        db.joinedload(Competitor.analysis_results)
+        joinedload(Competitor.analysis_results)
     ).all()
     return render_template("competitors.html", competitors=all_competitors)
 
@@ -38,13 +43,32 @@ def chat_page():
 def api_chat():
     """
     API endpoint to handle chat messages from the web interface.
+    It can now handle both text and image uploads.
     """
-    data = request.json
-    user_message = data.get("message")
-    if not user_message:
+    if 'message' not in request.form:
         return jsonify({"error": "No message provided"}), 400
 
-    ai_response = agent.chat(user_message)
+    user_message = request.form.get("message")
+    ai_response = ""
+
+    if 'image' in request.files and request.files['image'].filename != '':
+        image_file = request.files['image']
+        # Save the file temporarily to pass its path to the agent
+        # A more robust solution might use a temporary directory
+        temp_path = os.path.join("temp_uploads", image_file.filename)
+        os.makedirs("temp_uploads", exist_ok=True)
+        image_file.save(temp_path)
+
+        # Use the multimodal model for analysis
+        # Ensure you have a model like 'llava' pulled in Ollama
+        ai_response = agent.analyze_image(user_message, temp_path, model="llava")
+
+        # Clean up the temporary file
+        os.remove(temp_path)
+    else:
+        # Standard text-only chat
+        ai_response = agent.chat(user_message)
+
     return jsonify({"response": ai_response})
 
 if __name__ == "__main__":

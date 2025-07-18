@@ -1,53 +1,69 @@
 {% extends "base.html" %}
 
 {% block title %}داشبورد{% endblock %}
+{% block page_title %}داشبورد اصلی{% endblock %}
 
 {% block content %}
 <div class="row">
-    <div class="col-md-12">
-        <h1>داشبورد</h1>
-        <p class="lead">نمای کلی از وضعیت کسب و کار شما.</p>
+    <div class="col-lg-3 col-6">
+        <!-- small box -->
+        <div class="small-box bg-info">
+            <div class="inner">
+                <h3>{{ competitors|length }}</h3>
+                <p>رقیب شناسایی شده</p>
+            </div>
+            <div class="icon">
+                <i class="ion ion-bag"></i>
+            </div>
+            <a href="/competitors" class="small-box-footer">اطلاعات بیشتر <i class="fas fa-arrow-circle-left"></i></a>
+        </div>
     </div>
+    <!-- ./col -->
+    <div class="col-lg-3 col-6">
+        <!-- small box -->
+        <div class="small-box bg-success">
+            <div class="inner">
+                <h3>{{ analyses|length }}</h3>
+                <p>تحلیل انجام شده</p>
+            </div>
+            <div class="icon">
+                <i class="ion ion-stats-bars"></i>
+            </div>
+            <a href="/competitors" class="small-box-footer">اطلاعات بیشتر <i class="fas fa-arrow-circle-left"></i></a>
+        </div>
+    </div>
+    <!-- ./col -->
 </div>
 
 <div class="row">
-    <div class="col-md-6">
-        <div class="card">
+    <div class="col-md-12">
+        <div class="card card-primary card-outline">
             <div class="card-header">
-                رقبای شناسایی شده
+                <h3 class="card-title">آخرین تحلیل‌ها</h3>
             </div>
-            <div class="card-body">
-                {% if competitors %}
-                    <ul class="list-group">
-                        {% for competitor in competitors %}
-                            <li class="list-group-item">{{ competitor.url }}</li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p>هنوز رقیبی شناسایی نشده است.</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                آخرین تحلیل‌ها
-            </div>
-            <div class="card-body">
-                {% if analyses %}
-                    <ul class="list-group">
+            <div class="card-body p-0">
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>وب‌سایت رقیب</th>
+                            <th>توضیحات متا</th>
+                            <th>تاریخ تحلیل</th>
+                        </tr>
+                    </thead>
+                    <tbody>
                         {% for analysis in analyses %}
-                            <li class="list-group-item">
-                                <strong>{{ analysis.competitor.url }}</strong><br>
-                                <small>تاریخ: {{ analysis.analysis_date.strftime('%Y-%m-%d') }}</small><br>
-                                <em>{{ analysis.description | truncate(100) }}</em>
-                            </li>
+                        <tr>
+                            <td><a href="{{ analysis.competitor.url }}" target="_blank">{{ analysis.competitor.url }}</a></td>
+                            <td>{{ analysis.description | truncate(80) }}</td>
+                            <td>{{ analysis.analysis_date.strftime('%Y-%m-%d') }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="3" class="text-center">هنوز تحلیلی انجام نشده است.</td>
+                        </tr>
                         {% endfor %}
-                    </ul>
-                {% else %}
-                    <p>هنوز تحلیلی انجام نشده است.</p>
-                {% endif %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>

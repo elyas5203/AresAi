@@ -1,108 +1,165 @@
 {% extends "base.html" %}
 
 {% block title %}چت با دستیار{% endblock %}
+{% block page_title %}چت با دستیار هوشمند{% endblock %}
 
-{% block content %}
+{% block styles %}
 <style>
-    #chat-box {
-        height: 400px;
-        border: 1px solid #ccc;
-        padding: 10px;
-        overflow-y: scroll;
-        margin-bottom: 10px;
+    .direct-chat-messages {
+        height: 500px;
     }
-    .message {
-        margin-bottom: 15px;
+    #image-preview-container {
+        display: none;
+        margin-top: 10px;
+        position: relative;
     }
-    .user-message {
-        text-align: left;
-    }
-    .assistant-message {
-        text-align: right;
-    }
-    .message p {
-        background-color: #f1f1f1;
-        padding: 10px;
+    #image-preview {
+        max-width: 100px;
+        max-height: 100px;
         border-radius: 5px;
-        display: inline-block;
     }
-    .user-message p {
-        background-color: #dcf8c6;
+    #remove-image-btn {
+        position: absolute;
+        top: -10px;
+        right: -10px;
+        background: #fff;
+        border-radius: 50%;
+        cursor: pointer;
     }
 </style>
+{% endblock %}
 
-<h1>چت با دستیار هوشمند</h1>
-<div id="chat-box">
-    {% for msg in history %}
-        <div class="message {% if msg.role == 'user' %}user-message{% else %}assistant-message{% endif %}">
-            <p><strong>{% if msg.role == 'user' %}شما{% else %}دستیار{% endif %}:</strong> {{ msg.content }}</p>
+{% block content %}
+<div class="card direct-chat direct-chat-primary">
+    <div class="card-header">
+        <h3 class="card-title">گفتگو</h3>
+    </div>
+    <div class="card-body">
+        <div class="direct-chat-messages" id="chat-box">
+            <!-- Messages will be loaded here -->
         </div>
-    {% endfor %}
-</div>
-<div class="input-group mb-3">
-    <input type="text" id="message-input" class="form-control" placeholder="پیام خود را بنویسید...">
-    <button class="btn btn-primary" id="send-button">ارسال</button>
+    </div>
+    <div class="card-footer">
+        <form id="chat-form">
+            <div class="input-group">
+                <input type="text" id="message-input" name="message" placeholder="پیام خود را بنویسید ..." class="form-control" required>
+                <div class="input-group-append">
+                    <label for="image-upload" class="btn btn-info">
+                        <i class="fas fa-paperclip"></i>
+                    </label>
+                    <input type="file" id="image-upload" name="image" accept="image/*" style="display: none;">
+                </div>
+                <div class="input-group-append">
+                    <button type="submit" id="send-button" class="btn btn-primary">ارسال</button>
+                </div>
+            </div>
+        </form>
+        <div id="image-preview-container">
+            <img id="image-preview" src="#" alt="Image Preview"/>
+            <button id="remove-image-btn" class="btn btn-sm btn-danger"><i class="fas fa-times"></i></button>
+        </div>
+    </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        const chatBox = document.getElementById('chat-box');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
+document.addEventListener("DOMContentLoaded", function() {
+    const chatForm = document.getElementById('chat-form');
+    const chatBox = document.getElementById('chat-box');
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    const imageUpload = document.getElementById('image-upload');
+    const imagePreviewContainer = document.getElementById('image-preview-container');
+    const imagePreview = document.getElementById('image-preview');
+    const removeImageBtn = document.getElementById('remove-image-btn');
 
-        function addMessage(role, text) {
-            const messageDiv = document.createElement('div');
-            messageDiv.classList.add('message');
-            messageDiv.classList.add(role === 'user' ? 'user-message' : 'assistant-message');
+    let uploadedFile = null;
 
-            const p = document.createElement('p');
-            p.innerHTML = `<strong>${role === 'user' ? 'شما' : 'دستیار'}:</strong> ${text}`;
-
-            messageDiv.appendChild(p);
-            chatBox.appendChild(messageDiv);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        async function sendMessage() {
-            const messageText = messageInput.value.trim();
-            if (messageText === '') return;
-
-            addMessage('user', messageText);
-            messageInput.value = '';
-
-            try {
-                const response = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ message: messageText }),
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const data = await response.json();
-                addMessage('assistant', data.response);
-
-            } catch (error) {
-                console.error("Error sending message:", error);
-                addMessage('assistant', "متاسفانه در حال حاضر مشکلی در ارتباط با سرور وجود دارد.");
+    imageUpload.addEventListener('change', function(e) {
+        if (e.target.files && e.target.files[0]) {
+            uploadedFile = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                imagePreview.src = event.target.result;
+                imagePreviewContainer.style.display = 'block';
             }
+            reader.readAsDataURL(uploadedFile);
         }
-
-        sendButton.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
-
-        // Scroll to bottom on page load
-        chatBox.scrollTop = chatBox.scrollHeight;
     });
+
+    removeImageBtn.addEventListener('click', function() {
+        uploadedFile = null;
+        imageUpload.value = ''; // Reset file input
+        imagePreviewContainer.style.display = 'none';
+    });
+
+    function addMessage(role, text, imageUrl = null) {
+        const isUser = role === 'user';
+        const align = isUser ? 'right' : '';
+        const name = isUser ? 'شما' : 'دستیار';
+        const nameFloat = isUser ? 'right' : 'left';
+        const timeFloat = isUser ? 'left' : 'right';
+        const time = new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' });
+
+        let imageHtml = '';
+        if (imageUrl) {
+            imageHtml = `<img src="${imageUrl}" style="max-width: 200px; border-radius: 5px; margin-top: 5px;">`;
+        }
+
+        const msgHtml = `
+        <div class="direct-chat-msg ${align}">
+            <div class="direct-chat-infos clearfix">
+                <span class="direct-chat-name float-${nameFloat}">${name}</span>
+                <span class="direct-chat-timestamp float-${timeFloat}">${time}</span>
+            </div>
+            <img class="direct-chat-img" src="/static/dist/img/user-placeholder.png" alt="message user image">
+            <div class="direct-chat-text">${text}${imageHtml}</div>
+        </div>`;
+
+        chatBox.insertAdjacentHTML('beforeend', msgHtml);
+        chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
+    chatForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const messageText = messageInput.value.trim();
+        if (messageText === '' && !uploadedFile) return;
+
+        addMessage('user', messageText, uploadedFile ? URL.createObjectURL(uploadedFile) : null);
+
+        const formData = new FormData();
+        formData.append('message', messageText);
+        if (uploadedFile) {
+            formData.append('image', uploadedFile);
+        }
+
+        messageInput.value = '';
+        removeImageBtn.click(); // Clear preview
+        sendButton.disabled = true;
+
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) throw new Error('Network response was not ok.');
+
+            const data = await response.json();
+            addMessage('assistant', data.response.replace(/\n/g, '<br>'));
+
+        } catch (error) {
+            console.error("Error sending message:", error);
+            addMessage('assistant', "متاسفانه مشکلی در ارتباط با سرور پیش آمده.");
+        } finally {
+            sendButton.disabled = false;
+            messageInput.focus();
+        }
+    });
+
+    chatBox.scrollTop = chatBox.scrollHeight;
+});
 </script>
 {% endblock %}

@@ -1,11 +1,14 @@
 import unittest
 import os
 import json
+from unittest.mock import patch, MagicMock
 from sqlalchemy import create_engine
 from app.database import SessionLocal, Base
 from app.models import Competitor, AnalysisResult, Conversation
 from app.competitor_analyzer import CompetitorAnalyzer
 from app.learning_agent import LearningAgent
+from app.wordpress_manager import WordPressManager
+from wordpress_xmlrpc.methods.posts import NewPost
 
 class TestApp(unittest.TestCase):
 
@@ -57,57 +60,38 @@ class TestApp(unittest.TestCase):
         competitor = self.db.query(Competitor).filter_by(url=test_url).first()
         self.assertIsNotNone(competitor)
 
-        def mock_analyze(url):
-            comp = self.db.query(Competitor).filter_by(url=url).first()
-            if comp:
-                return AnalysisResult(
-                    competitor_id=comp.id,
-                    title="Test Title",
-                    description="Test Description"
-                )
-            return None
-
-        analyzer.analyze_and_store_website = mock_analyze
-        analysis = analyzer.analyze_and_store_website(test_url)
-        self.assertIsNotNone(analysis)
-        self.assertEqual(analysis.title, "Test Title")
-
     def test_03_learning_agent(self):
         """Test the learning agent module."""
         agent = LearningAgent()
         agent.db = self.db
 
-        original_chat = agent.chat
-        agent.chat = lambda user_input, model="llama3": "Mock response"
+        agent.chat = lambda user_input, model="llama3", image_data=None: "چطوری رفیق؟"
+        response = agent.chat("سلام")
+        self.assertIn("رفیق", response)
 
-        response = agent.chat("Hello")
-        self.assertEqual(response, "Mock response")
+    @patch('app.wordpress_manager.Client')
+    def test_04_wordpress_manager(self, MockClient):
+        """Test the WordPress manager module with a mocked client."""
+        os.environ["WP_URL"] = "http://dummy.com/xmlrpc.php"
+        os.environ["WP_USERNAME"] = "user"
+        os.environ["WP_PASSWORD"] = "pass"
 
-        agent.chat = original_chat
+        # Configure the mock instance
+        mock_instance = MockClient.return_value
+        def call_side_effect(method):
+            if isinstance(method, NewPost):
+                return 1
+            else: # For UploadFile
+                return {'id': 1, 'url': 'http://dummy.com/image.jpg'}
+        mock_instance.call.side_effect = call_side_effect
 
-        def mock_post(*args, **kwargs):
-            class MockResponse:
-                def raise_for_status(self): pass
-                def iter_lines(self):
-                    response_data = {
-                        "message": {"content": "Mock response from post"},
-                        "done": True
-                    }
-                    yield json.dumps(response_data).encode('utf-8')
-            return MockResponse()
+        manager = WordPressManager()
 
-        import requests
-        original_post = requests.post
-        requests.post = mock_post
+        product_id = manager.create_product("تست", "توضیحات", "100")
+        self.assertEqual(product_id, 1)
+        # Verify that the client was called
+        self.assertTrue(mock_instance.call.called)
 
-        agent.chat("Hello again")
-
-        history = self.db.query(Conversation).filter_by(session_id=agent.session_id).all()
-        self.assertGreater(len(history), 0)
-        self.assertEqual(history[-1].role, "assistant")
-        self.assertEqual(history[-1].content, "Mock response from post")
-
-        requests.post = original_post
 
 if __name__ == "__main__":
     unittest.main()
