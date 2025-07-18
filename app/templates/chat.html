@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}چت با دستیار{% endblock %}
+
+{% block content %}
+<style>
+    #chat-box {
+        height: 400px;
+        border: 1px solid #ccc;
+        padding: 10px;
+        overflow-y: scroll;
+        margin-bottom: 10px;
+    }
+    .message {
+        margin-bottom: 15px;
+    }
+    .user-message {
+        text-align: left;
+    }
+    .assistant-message {
+        text-align: right;
+    }
+    .message p {
+        background-color: #f1f1f1;
+        padding: 10px;
+        border-radius: 5px;
+        display: inline-block;
+    }
+    .user-message p {
+        background-color: #dcf8c6;
+    }
+</style>
+
+<h1>چت با دستیار هوشمند</h1>
+<div id="chat-box">
+    {% for msg in history %}
+        <div class="message {% if msg.role == 'user' %}user-message{% else %}assistant-message{% endif %}">
+            <p><strong>{% if msg.role == 'user' %}شما{% else %}دستیار{% endif %}:</strong> {{ msg.content }}</p>
+        </div>
+    {% endfor %}
+</div>
+<div class="input-group mb-3">
+    <input type="text" id="message-input" class="form-control" placeholder="پیام خود را بنویسید...">
+    <button class="btn btn-primary" id="send-button">ارسال</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const chatBox = document.getElementById('chat-box');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+
+        function addMessage(role, text) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message');
+            messageDiv.classList.add(role === 'user' ? 'user-message' : 'assistant-message');
+
+            const p = document.createElement('p');
+            p.innerHTML = `<strong>${role === 'user' ? 'شما' : 'دستیار'}:</strong> ${text}`;
+
+            messageDiv.appendChild(p);
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const messageText = messageInput.value.trim();
+            if (messageText === '') return;
+
+            addMessage('user', messageText);
+            messageInput.value = '';
+
+            try {
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ message: messageText }),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+                addMessage('assistant', data.response);
+
+            } catch (error) {
+                console.error("Error sending message:", error);
+                addMessage('assistant', "متاسفانه در حال حاضر مشکلی در ارتباط با سرور وجود دارد.");
+            }
+        }
+
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Scroll to bottom on page load
+        chatBox.scrollTop = chatBox.scrollHeight;
+    });
+</script>
+{% endblock %}

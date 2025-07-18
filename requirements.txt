@@ -1,0 +1,6 @@
+beautifulsoup4
+Flask
+python-telegram-bot
+requests
+SQLAlchemy
+# Add other libraries as needed

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}لیست رقبا{% endblock %}
+
+{% block content %}
+<h1>لیست رقبا و تحلیل‌ها</h1>
+<p>در این صفحه می‌توانید لیست کامل رقبا و تحلیل‌های انجام شده برای هرکدام را مشاهده کنید.</p>
+
+{% for competitor in competitors %}
+<div class="card mb-3">
+    <div class="card-header">
+        <a href="{{ competitor.url }}" target="_blank">{{ competitor.url }}</a>
+    </div>
+    <div class="card-body">
+        {% if competitor.analysis_results %}
+            <ul class="list-group">
+                {% for analysis in competitor.analysis_results %}
+                <li class="list-group-item">
+                    <h5>تحلیل تاریخ: {{ analysis.analysis_date.strftime('%Y-%m-%d %H:%M') }}</h5>
+                    <p><strong>عنوان:</strong> {{ analysis.title }}</p>
+                    <p><strong>توضیحات:</strong> {{ analysis.description }}</p>
+                    <p><strong>کلمات کلیدی:</strong> {{ analysis.keywords }}</p>
+                </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p>هنوز تحلیلی برای این رقیب ثبت نشده است.</p>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+
+{% endblock %}
