@@ -1,5 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
+from googlesearch import search
 from app.database import SessionLocal
 from app.models import Competitor, AnalysisResult
 
@@ -9,24 +10,18 @@ class CompetitorAnalyzer:
 
     def find_competitors(self, keywords, num_results=10):
         """
-        Searches Google for keywords and returns a list of competitor URLs.
+        Searches Google for keywords using the googlesearch library
+        and returns a list of competitor URLs.
         """
         competitors = []
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3'}
-        for keyword in keywords:
-            print(f"Searching for: {keyword}")
-            try:
-                response = requests.get(f"https://www.google.com/search?q={keyword}&num={num_results}", headers=headers)
-                response.raise_for_status()
-                soup = BeautifulSoup(response.text, 'html.parser')
-                for g in soup.find_all('div', class_='g'):
-                    anchors = g.find_all('a')
-                    if anchors:
-                        link = anchors[0]['href']
-                        if link.startswith('http'):
-                            competitors.append(link)
-            except requests.exceptions.RequestException as e:
-                print(f"Error searching for {keyword}: {e}")
+        print(f"Searching for competitors with keywords: {keywords}")
+        try:
+            # The search function is a generator, so we iterate through it
+            # lang='fa' for Persian results
+            for url in search(' '.join(keywords), num_results=num_results, lang='fa'):
+                competitors.append(url)
+        except Exception as e:
+            print(f"An error occurred during Google search: {e}")
 
         unique_urls = list(set(competitors))
         self.store_competitors(unique_urls)
@@ -36,6 +31,8 @@ class CompetitorAnalyzer:
         """
         Stores new competitor URLs in the database.
         """
+        if not urls:
+            return
         for url in urls:
             exists = self.db.query(Competitor).filter(Competitor.url == url).first()
             if not exists:
@@ -43,7 +40,6 @@ class CompetitorAnalyzer:
                 self.db.add(new_competitor)
         self.db.commit()
         print(f"Stored {len(urls)} competitor URLs in the database.")
-
 
     def analyze_and_store_website(self, url):
         """
@@ -55,7 +51,8 @@ class CompetitorAnalyzer:
             return None
 
         try:
-            response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
+            response = requests.get(url, headers=headers, timeout=10)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
 
@@ -79,18 +76,17 @@ class CompetitorAnalyzer:
             print(f"Could not analyze {url}: {e}")
             return None
 
-    def analyze_instagram_profile(self, username):
-        """
-        Placeholder for Instagram analysis.
-        """
-        print(f"Analyzing Instagram profile: {username}")
-        return {"username": username, "status": "analysis not implemented"}
-
 if __name__ == '__main__':
     analyzer = CompetitorAnalyzer()
-    search_keywords = ["فروشگاه اینترنتی لوازم تحریر لوکس"]
+    search_keywords = ["فروشگاه اینترنتی لوازم تحریر لوکس", "خرید آنلاین لوازم تحریر فانتزی"]
     competitor_urls = analyzer.find_competitors(search_keywords)
 
     if competitor_urls:
-        for url in competitor_urls[:3]: # Analyze and store top 3
-            analyzer.analyze_and_store_website(url)
+        print("\n--- Found Competitors ---")
+        for c_url in competitor_urls:
+            print(c_url)
+            # Analyze and store the first 3 results
+            if competitor_urls.index(c_url) < 3:
+                analyzer.analyze_and_store_website(c_url)
+    else:
+        print("No competitors found.")

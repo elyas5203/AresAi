@@ -94,6 +94,25 @@ class LearningAgent:
             print(f"Error analyzing image: {e}")
             return "شرمنده، نتونستم عکس رو تحلیل کنم. فایلش مشکلی نداشت؟"
 
+    def get_advice(self, competitor_analysis_results):
+        """
+        Generates business advice based on competitor analysis.
+        """
+        if not competitor_analysis_results:
+            return "هیچ تحلیلی برای ارائه مشاوره وجود نداره. اول باید چندتا از رقبامون رو تحلیل کنیم."
+
+        prompt = "بر اساس تحلیل‌های زیر از رقبای من، چندتا راهکار عملی و خلاقانه برای کسب و کار لوازم تحریر لوکس من پیشنهاد بده:\n\n"
+        for result in competitor_analysis_results:
+            # Check if the result object has a competitor relationship
+            if hasattr(result, 'competitor') and result.competitor:
+                prompt += f"- وب‌سایت: {result.competitor.url}\n  توضیحات: {result.description}\n\n"
+            else:
+                prompt += f"- تحلیل بدون مشخصات رقیب: {result.description}\n\n"
+
+        prompt += "\nایده‌های جدید برای بازاریابی، محصولات جدید، یا بهبود وب‌سایت چی داری؟ خیلی خودمونی و واضح بگو."
+
+        return self.chat(prompt)
+
 
 if __name__ == '__main__':
     agent = LearningAgent()

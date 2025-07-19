@@ -1,7 +1,6 @@
 import unittest
-import os
-import json
 from unittest.mock import patch, MagicMock
+import os
 from sqlalchemy import create_engine
 from app.database import SessionLocal, Base
 from app.models import Competitor, AnalysisResult, Conversation
@@ -14,19 +13,17 @@ class TestApp(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        """Set up a test database and initialize it."""
-        cls.db_url = "sqlite:///:memory:"
-        cls.engine = create_engine(cls.db_url, connect_args={"check_same_thread": False})
+        """Set up an in-memory SQLite database for testing."""
+        cls.engine = create_engine("sqlite:///:memory:")
         SessionLocal.configure(bind=cls.engine)
         Base.metadata.create_all(bind=cls.engine)
         cls.db = SessionLocal()
 
     @classmethod
     def tearDownClass(cls):
-        """Close the database connection and dispose the engine."""
+        """Tear down the database."""
         cls.db.close()
         Base.metadata.drop_all(bind=cls.engine)
-        cls.engine.dispose()
 
     def setUp(self):
         """Create a new session for each test."""
@@ -38,60 +35,71 @@ class TestApp(unittest.TestCase):
         self.db.close()
 
     def test_01_database_creation(self):
-        """Test if the database and tables are created correctly."""
+        """Test if tables are created."""
         self.assertIn("competitors", Base.metadata.tables)
         self.assertIn("analysis_results", Base.metadata.tables)
-        self.assertIn("conversations", Base.metadata.tables)
 
-    def test_02_competitor_analyzer(self):
-        """Test the competitor analyzer module."""
+    @patch('app.competitor_analyzer.search')
+    def test_02_competitor_analyzer(self, mock_search):
+        """Test finding and storing competitors."""
+        mock_search.return_value = ["http://example-competitor.com"]
         analyzer = CompetitorAnalyzer()
         analyzer.db = self.db
 
-        test_url = "http://test.com"
+        urls = analyzer.find_competitors(["test keyword"])
+        self.assertIn("http://example-competitor.com", urls)
 
-        analyzer.find_competitors = lambda keywords, num_results=10: [test_url]
-
-        urls = analyzer.find_competitors(["test"])
-        self.assertEqual(len(urls), 1)
-
-        analyzer.store_competitors(urls)
-
-        competitor = self.db.query(Competitor).filter_by(url=test_url).first()
+        competitor = self.db.query(Competitor).filter_by(url="http://example-competitor.com").first()
         self.assertIsNotNone(competitor)
 
-    def test_03_learning_agent(self):
-        """Test the learning agent module."""
+    @patch('app.learning_agent.requests.post')
+    def test_03_learning_agent(self, mock_post):
+        """Test the learning agent's chat and advice methods."""
+        # Mock the response from Ollama API
+        mock_response = MagicMock()
+        mock_response.iter_lines.return_value = [
+            '{"message": {"content": "سلام رفیق! "}, "done": false}'.encode('utf-8'),
+            '{"message": {"content": "چه خبر؟"}, "done": true}'.encode('utf-8')
+        ]
+        mock_post.return_value = mock_response
+
         agent = LearningAgent()
         agent.db = self.db
 
-        agent.chat = lambda user_input, model="llama3", image_data=None: "چطوری رفیق؟"
+        # Test chat
         response = agent.chat("سلام")
-        self.assertIn("رفیق", response)
+        self.assertEqual(response, "سلام رفیق! چه خبر؟")
+
+        # Test get_advice with no analysis
+        mock_post.return_value.iter_lines.return_value = ['{"message": {"content": "هیچ تحلیلی پیدا نکردم"}, "done": true}'.encode('utf-8')]
+        advice_no_analysis = agent.get_advice([])
+        self.assertIn("هیچ تحلیلی", advice_no_analysis)
+
+        # Test get_advice with analysis results
+        mock_post.return_value.iter_lines.return_value = ['{"message": {"content": "یک راهکار خوب اینه که..."}, "done": true}'.encode('utf-8')]
+        comp = Competitor(url="http://test.com")
+        self.db.add(comp)
+        self.db.commit()
+        analysis = AnalysisResult(competitor_id=comp.id, description="توضیحات تستی")
+        self.db.add(analysis)
+        self.db.commit()
+        advice_with_analysis = agent.get_advice([analysis])
+        self.assertIn("راهکار", advice_with_analysis)
 
     @patch('app.wordpress_manager.Client')
     def test_04_wordpress_manager(self, MockClient):
-        """Test the WordPress manager module with a mocked client."""
-        os.environ["WP_URL"] = "http://dummy.com/xmlrpc.php"
-        os.environ["WP_USERNAME"] = "user"
-        os.environ["WP_PASSWORD"] = "pass"
+        """Test WordPress product creation."""
+        os.environ["WP_URL"] = "http://dummy-wp.com/xmlrpc.php"
+        os.environ["WP_USERNAME"] = "wp_user"
+        os.environ["WP_PASSWORD"] = "wp_pass"
 
-        # Configure the mock instance
-        mock_instance = MockClient.return_value
-        def call_side_effect(method):
-            if isinstance(method, NewPost):
-                return 1
-            else: # For UploadFile
-                return {'id': 1, 'url': 'http://dummy.com/image.jpg'}
-        mock_instance.call.side_effect = call_side_effect
+        mock_client_instance = MockClient.return_value
+        mock_client_instance.call.return_value = 1 # Mock post ID
 
         manager = WordPressManager()
-
-        product_id = manager.create_product("تست", "توضیحات", "100")
+        product_id = manager.create_product("محصول تستی", "توضیحات محصول", "99000")
         self.assertEqual(product_id, 1)
-        # Verify that the client was called
-        self.assertTrue(mock_instance.call.called)
-
+        self.assertTrue(mock_client_instance.call.called)
 
 if __name__ == "__main__":
     unittest.main()

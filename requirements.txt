@@ -6,4 +6,5 @@ SQLAlchemy
 python-dotenv
 PyMySQL
 python-wordpress-xmlrpc
+googlesearch-python
 # Add other libraries as needed
