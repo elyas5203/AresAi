@@ -1,5 +1,5 @@
 import os
-from dotenv import load_dotenv
+from python_dotenv import load_dotenv
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from app.learning_agent import LearningAgent

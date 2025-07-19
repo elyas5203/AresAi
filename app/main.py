@@ -1,5 +1,5 @@
 import os
-from dotenv import load_dotenv
+from python_dotenv import load_dotenv
 from app.content_publisher import ContentPublisher
 from app.competitor_analyzer import CompetitorAnalyzer
 from app.learning_agent import LearningAgent
