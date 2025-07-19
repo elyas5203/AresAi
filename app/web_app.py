@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify
-from python_dotenv import load_dotenv
+from dotenv import load_dotenv
 from app.database import SessionLocal
 from app.models import Competitor, AnalysisResult, Conversation
 from app.learning_agent import LearningAgent
