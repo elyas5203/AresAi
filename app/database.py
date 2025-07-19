@@ -1,5 +1,5 @@
 import os
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
 from dotenv import load_dotenv
@@ -12,10 +12,12 @@ DB_PASSWORD = os.getenv("DB_PASSWORD", "")
 DB_HOST = os.getenv("DB_HOST", "localhost")
 DB_NAME = os.getenv("DB_NAME", "business_assistant")
 
-# Define the database URL for MySQL
-DATABASE_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
+# Connection URL without the database name to check for its existence
+SERVER_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}"
+DATABASE_URL = f"{SERVER_URL}/{DB_NAME}"
 
-# Create a new SQLAlchemy engine instance
+# Create engines
+server_engine = create_engine(SERVER_URL)
 engine = create_engine(DATABASE_URL)
 
 # Create a new session factory
@@ -25,20 +27,34 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 def init_db():
-    # Import all models here before calling Base.metadata.create_all
+    """
+    Initializes the database. Creates the database if it does not exist,
+    then creates all tables.
+    """
     from app.models import Competitor, AnalysisResult, Conversation
-    print("Creating database and tables if they don't exist...")
-    # This will create the database if it doesn't exist
-    try:
-        engine.connect()
-    except Exception as e:
-        if "1049" in str(e): # Database does not exist
-            print(f"Database '{DB_NAME}' does not exist. Please create it first.")
-            # Or you can create it programmatically, but that requires admin privileges
-            # For simplicity, we'll ask the user to create it.
-            return
-        raise e
 
+    try:
+        # Try to connect to the specific database
+        with engine.connect() as connection:
+            print(f"Successfully connected to database '{DB_NAME}'.")
+    except Exception as e:
+        # If connection fails, it might be because the database doesn't exist
+        if "1049" in str(e):
+            print(f"Database '{DB_NAME}' not found. Attempting to create it...")
+            try:
+                with server_engine.connect() as connection:
+                    connection.execute(text(f"CREATE DATABASE {DB_NAME} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"))
+                    print(f"Database '{DB_NAME}' created successfully.")
+            except Exception as create_error:
+                print(f"Failed to create database '{DB_NAME}': {create_error}")
+                return # Stop if we can't create the DB
+        else:
+            # For other connection errors, just raise them
+            print(f"An unexpected error occurred: {e}")
+            raise e
+
+    # Now, create all tables in the (now existing) database
+    print("Creating tables...")
     Base.metadata.create_all(bind=engine)
     print("Database tables are ready.")
 
