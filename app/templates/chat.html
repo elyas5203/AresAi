@@ -7,15 +7,47 @@
 <style>
     .direct-chat-messages {
         height: 500px;
+        display: flex;
+        flex-direction: column;
+    }
+    .direct-chat-msg {
+        max-width: 80%;
+    }
+    .right .direct-chat-msg {
+        align-self: flex-end;
+    }
+    .direct-chat-text {
+        word-wrap: break-word;
+    }
+    .direct-chat-text img {
+        max-width: 100%;
+        border-radius: 5px;
+        margin-top: 5px;
+    }
+    #chat-input-container {
+        position: relative;
+        border: 1px solid #ced4da;
+        border-radius: .25rem;
+        padding: 10px;
+    }
+    #message-input {
+        border: none;
+        resize: none;
+        width: 100%;
+        padding-right: 40px; /* Space for the upload button */
+    }
+    #message-input:focus {
+        outline: none;
+        box-shadow: none;
     }
     #image-preview-container {
-        display: none;
         margin-top: 10px;
         position: relative;
+        display: inline-block;
     }
     #image-preview {
-        max-width: 100px;
-        max-height: 100px;
+        max-width: 80px;
+        max-height: 80px;
         border-radius: 5px;
     }
     #remove-image-btn {
@@ -25,6 +57,13 @@
         background: #fff;
         border-radius: 50%;
         cursor: pointer;
+        display: none;
+    }
+    #upload-button {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
     }
 </style>
 {% endblock %}
@@ -36,28 +75,26 @@
     </div>
     <div class="card-body">
         <div class="direct-chat-messages" id="chat-box">
-            <!-- Messages will be loaded here -->
+            <!-- Messages appear here -->
         </div>
     </div>
     <div class="card-footer">
         <form id="chat-form">
-            <div class="input-group">
-                <input type="text" id="message-input" name="message" placeholder="پیام خود را بنویسید ..." class="form-control" required>
-                <div class="input-group-append">
-                    <label for="image-upload" class="btn btn-info">
+            <div id="chat-input-container">
+                <textarea id="message-input" name="message" placeholder="اینجا بنویس..." class="form-control" rows="1"></textarea>
+                <div id="image-preview-container">
+                    <img id="image-preview" src="#" alt="Image Preview"/>
+                    <button type="button" id="remove-image-btn" class="btn btn-xs btn-danger"><i class="fas fa-times"></i></button>
+                </div>
+                <div id="upload-button">
+                    <label for="image-upload" class="btn btn-light btn-sm">
                         <i class="fas fa-paperclip"></i>
                     </label>
                     <input type="file" id="image-upload" name="image" accept="image/*" style="display: none;">
                 </div>
-                <div class="input-group-append">
-                    <button type="submit" id="send-button" class="btn btn-primary">ارسال</button>
-                </div>
             </div>
+            <button type="submit" id="send-button" class="btn btn-primary mt-2 float-left">ارسال</button>
         </form>
-        <div id="image-preview-container">
-            <img id="image-preview" src="#" alt="Image Preview"/>
-            <button id="remove-image-btn" class="btn btn-sm btn-danger"><i class="fas fa-times"></i></button>
-        </div>
     </div>
 </div>
 {% endblock %}
@@ -76,13 +113,20 @@ document.addEventListener("DOMContentLoaded", function() {
 
     let uploadedFile = null;
 
+    // Auto-resize textarea
+    messageInput.addEventListener('input', function () {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
+
     imageUpload.addEventListener('change', function(e) {
         if (e.target.files && e.target.files[0]) {
             uploadedFile = e.target.files[0];
             const reader = new FileReader();
             reader.onload = function(event) {
                 imagePreview.src = event.target.result;
-                imagePreviewContainer.style.display = 'block';
+                imagePreviewContainer.style.display = 'inline-block';
+                removeImageBtn.style.display = 'inline-block';
             }
             reader.readAsDataURL(uploadedFile);
         }
@@ -90,8 +134,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
     removeImageBtn.addEventListener('click', function() {
         uploadedFile = null;
-        imageUpload.value = ''; // Reset file input
+        imageUpload.value = '';
         imagePreviewContainer.style.display = 'none';
+        removeImageBtn.style.display = 'none';
     });
 
     function addMessage(role, text, imageUrl = null) {
@@ -104,7 +149,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
         let imageHtml = '';
         if (imageUrl) {
-            imageHtml = `<img src="${imageUrl}" style="max-width: 200px; border-radius: 5px; margin-top: 5px;">`;
+            imageHtml = `<img src="${imageUrl}" style="max-width: 200px; border-radius: 5px; margin-top: 5px;" alt="uploaded image">`;
         }
 
         const msgHtml = `
@@ -114,7 +159,10 @@ document.addEventListener("DOMContentLoaded", function() {
                 <span class="direct-chat-timestamp float-${timeFloat}">${time}</span>
             </div>
             <img class="direct-chat-img" src="/static/dist/img/user-placeholder.png" alt="message user image">
-            <div class="direct-chat-text">${text}${imageHtml}</div>
+            <div class="direct-chat-text">
+                ${text.replace(/\n/g, '<br>')}
+                ${imageHtml}
+            </div>
         </div>`;
 
         chatBox.insertAdjacentHTML('beforeend', msgHtml);
@@ -135,9 +183,12 @@ document.addEventListener("DOMContentLoaded", function() {
             formData.append('image', uploadedFile);
         }
 
+        // Reset form
         messageInput.value = '';
-        removeImageBtn.click(); // Clear preview
+        messageInput.style.height = 'auto';
+        removeImageBtn.click();
         sendButton.disabled = true;
+        sendButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
 
         try {
             const response = await fetch('/api/chat', {
@@ -148,13 +199,14 @@ document.addEventListener("DOMContentLoaded", function() {
             if (!response.ok) throw new Error('Network response was not ok.');
 
             const data = await response.json();
-            addMessage('assistant', data.response.replace(/\n/g, '<br>'));
+            addMessage('assistant', data.response);
 
         } catch (error) {
             console.error("Error sending message:", error);
             addMessage('assistant', "متاسفانه مشکلی در ارتباط با سرور پیش آمده.");
         } finally {
             sendButton.disabled = false;
+            sendButton.innerHTML = 'ارسال';
             messageInput.focus();
         }
     });
