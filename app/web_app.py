@@ -6,9 +6,17 @@ from app.learning_agent import LearningAgent
 
 load_dotenv()
 
+from app.database import init_db
+
 app = Flask(__name__)
 db = SessionLocal()
 agent = LearningAgent() # We can share one agent instance
+
+@app.before_request
+def create_tables_if_not_exist():
+    # This function will run before the first request to the application.
+    # It's a robust way to ensure the database is ready.
+    init_db()
 
 @app.route("/")
 def dashboard():
