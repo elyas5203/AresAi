@@ -74,4 +74,4 @@ def api_chat():
 if __name__ == "__main__":
     # Make sure to create the database first by running:
     # python -m app.database
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
