@@ -7,9 +7,9 @@ class Competitor(Base):
     __tablename__ = "competitors"
 
     id = Column(Integer, primary_key=True, index=True)
-    url = Column(String, unique=True, index=True, nullable=False)
-    name = Column(String, index=True)
-    instagram_username = Column(String, unique=True, index=True)
+    url = Column(String(1024), unique=True, index=True, nullable=False)
+    name = Column(String(255), index=True)
+    instagram_username = Column(String(255), unique=True, index=True)
 
     analysis_results = relationship("AnalysisResult", back_populates="competitor")
 
@@ -21,7 +21,7 @@ class AnalysisResult(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     competitor_id = Column(Integer, ForeignKey("competitors.id"), nullable=False)
-    title = Column(String)
+    title = Column(String(512))
     description = Column(Text)
     keywords = Column(Text)
     analysis_date = Column(DateTime(timezone=True), server_default=func.now())
@@ -35,8 +35,8 @@ class Conversation(Base):
     __tablename__ = "conversations"
 
     id = Column(Integer, primary_key=True, index=True)
-    session_id = Column(String, index=True, nullable=False) # To group messages by session
-    role = Column(String, nullable=False) # "user" or "assistant"
+    session_id = Column(String(255), index=True, nullable=False) # To group messages by session
+    role = Column(String(50), nullable=False) # "user" or "assistant"
     content = Column(Text, nullable=False)
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
 
