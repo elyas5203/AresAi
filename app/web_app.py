@@ -119,6 +119,41 @@ def api_suggest_hashtags():
 
     return jsonify({"hashtags": hashtags})
 
+@app.route("/manage-competitors", methods=["GET"])
+def manage_competitors_page():
+    """Renders the competitor management page."""
+    all_competitors = db.query(Competitor).order_by(Competitor.id.desc()).all()
+    return render_template("manage_competitors.html", competitors=all_competitors)
+
+@app.route("/competitors/add", methods=["POST"])
+def add_competitor():
+    """Adds a new competitor to the database."""
+    url = request.form.get("url")
+    instagram = request.form.get("instagram_username")
+
+    if not url and not instagram:
+        # Add a flash message for error
+        return redirect(url_for("manage_competitors_page"))
+
+    new_competitor = Competitor(url=url, instagram_username=instagram)
+    db.add(new_competitor)
+    db.commit()
+
+    # Add a flash message for success
+    return redirect(url_for("manage_competitors_page"))
+
+@app.route("/competitors/delete/<int:competitor_id>")
+def delete_competitor(competitor_id):
+    """Deletes a competitor from the database."""
+    competitor = db.query(Competitor).get(competitor_id)
+    if competitor:
+        # Also delete related analysis results to maintain integrity
+        db.query(AnalysisResult).filter_by(competitor_id=competitor.id).delete()
+        db.delete(competitor)
+        db.commit()
+        # Add a flash message
+    return redirect(url_for("manage_competitors_page"))
+
 if __name__ == "__main__":
     # This block is now for direct execution via `python app/web_app.py`
     # The `init_db` is called via the `before_request` hook.
