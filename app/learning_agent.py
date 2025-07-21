@@ -125,6 +125,30 @@ class LearningAgent:
 
         return self.chat(prompt)
 
+    def suggest_hashtags(self, caption, image_path=None):
+        """
+        Suggests relevant and trending hashtags for an Instagram post.
+        """
+        prompt = f"""
+        برای یک پست اینستاگرام با کپشن زیر، یک لیست از 20 هشتگ مناسب پیشنهاد بده. هشتگ‌ها باید ترکیبی از هشتگ‌های عمومی، تخصصی و مرتبط با برند 'تحریرچی‌شاپ' باشن.
+
+        **کپشن:**
+        "{caption}"
+
+        لطفاً هشتگ‌ها را در یک خط و با فاصله از هم، بدون هیچ توضیح اضافه‌ای، فقط به صورت `#هشتگ1 #هشتگ2` برگردون.
+        """
+
+        image_data = None
+        if image_path:
+            try:
+                with open(image_path, "rb") as image_file:
+                    image_data = base64.b64encode(image_file.read()).decode('utf-8')
+            except Exception as e:
+                print(f"Could not read image for hashtag suggestion: {e}")
+
+        # Use a powerful model for creative tasks like this
+        return self.chat(prompt, model="llama3", image_data=image_data)
+
 
 if __name__ == '__main__':
     agent = LearningAgent()

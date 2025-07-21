@@ -47,6 +47,16 @@ def chat_page():
     history = agent._load_history() # Using the agent's method to get current session history
     return render_template("chat.html", history=history)
 
+@app.route("/competitor-dashboard")
+def competitor_dashboard():
+    """
+    Renders the competitor analysis dashboard with charts.
+    """
+    all_analyses = db.query(AnalysisResult).options(
+        joinedload(AnalysisResult.competitor)
+    ).order_by(AnalysisResult.analysis_date.desc()).limit(10).all()
+    return render_template("competitor_dashboard.html", analyses=all_analyses)
+
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
     """
@@ -79,7 +89,37 @@ def api_chat():
 
     return jsonify({"response": ai_response})
 
+@app.route("/hashtag-suggester", methods=["GET"])
+def hashtag_suggester_page():
+    """Renders the hashtag suggester page."""
+    return render_template("hashtag_suggester.html")
+
+@app.route("/api/suggest-hashtags", methods=["POST"])
+def api_suggest_hashtags():
+    """
+    API endpoint to handle hashtag suggestions.
+    """
+    if 'caption' not in request.form:
+        return jsonify({"error": "No caption provided"}), 400
+
+    caption = request.form.get("caption")
+    image_path = None
+
+    if 'image' in request.files and request.files['image'].filename != '':
+        image_file = request.files['image']
+        temp_path = os.path.join("temp_uploads", image_file.filename)
+        os.makedirs("temp_uploads", exist_ok=True)
+        image_file.save(temp_path)
+        image_path = temp_path
+
+    hashtags = agent.suggest_hashtags(caption, image_path=image_path)
+
+    if image_path:
+        os.remove(image_path)
+
+    return jsonify({"hashtags": hashtags})
+
 if __name__ == "__main__":
-    # Make sure to create the database first by running:
-    # python -m app.database
+    # This block is now for direct execution via `python app/web_app.py`
+    # The `init_db` is called via the `before_request` hook.
     app.run(debug=True, host='0.0.0.0', port=5000)

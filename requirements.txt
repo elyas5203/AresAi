@@ -7,4 +7,5 @@ python-dotenv
 PyMySQL
 python-wordpress-xmlrpc
 googlesearch-python
+schedule
 # Add other libraries as needed

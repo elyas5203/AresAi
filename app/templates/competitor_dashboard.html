@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}داشبورد تحلیل رقبا{% endblock %}
+{% block page_title %}داشبورد تحلیل رقبا{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">مقایسه تعداد کلمات کلیدی</h3>
+            </div>
+            <div class="card-body">
+                <canvas id="keywordsChart" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">مقایسه طول توضیحات</h3>
+            </div>
+            <div class="card-body">
+                <canvas id="descriptionLengthChart" style="min-height: 250px; height: 250px; max-height: 250px; max-width: 100%;"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    // Keywords Chart
+    const keywordsCtx = document.getElementById('keywordsChart').getContext('2d');
+    new Chart(keywordsCtx, {
+        type: 'bar',
+        data: {
+            labels: [{% for analysis in analyses %}"{{ analysis.competitor.url | truncate(20) }}",{% endfor %}],
+            datasets: [{
+                label: 'تعداد کلمات کلیدی',
+                data: [{% for analysis in analyses %}{{ analysis.keywords.split(',') | length }},{% endfor %}],
+                backgroundColor: 'rgba(243, 156, 18, 0.8)',
+                borderColor: 'rgba(243, 156, 18, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+
+    // Description Length Chart
+    const descriptionLengthCtx = document.getElementById('descriptionLengthChart').getContext('2d');
+    new Chart(descriptionLengthCtx, {
+        type: 'line',
+        data: {
+            labels: [{% for analysis in analyses %}"{{ analysis.competitor.url | truncate(20) }}",{% endfor %}],
+            datasets: [{
+                label: 'طول توضیحات (کاراکتر)',
+                data: [{% for analysis in analyses %}{{ analysis.description | length }},{% endfor %}],
+                backgroundColor: 'rgba(44, 62, 80, 0.2)',
+                borderColor: 'rgba(44, 62, 80, 1)',
+                borderWidth: 2,
+                fill: true
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+});
+</script>
+{% endblock %}
